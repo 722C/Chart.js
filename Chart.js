@@ -2512,6 +2512,7 @@
 					strokeColor : dataset.strokeColor,
 					pointColor : dataset.pointColor,
 					pointStrokeColor : dataset.pointStrokeColor,
+					lineDash: dataset.lineDash || false,
 					points : []
 				};
 
@@ -2738,7 +2739,7 @@
 				ctx.lineWidth = this.options.datasetStrokeWidth;
 				ctx.strokeStyle = dataset.strokeColor;
 
-				if (dataset.scaleLineDash) {
+				if (dataset.lineDash) {
 					ctx.setLineDash([5,3]);
 				}
 				else {
