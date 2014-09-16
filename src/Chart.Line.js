@@ -44,7 +44,10 @@
 		datasetFill : true,
 
 		//String - A legend template
-		legendTemplate : "<ul class=\"<%=name.toLowerCase()%>-legend\"><% for (var i=0; i<datasets.length; i++){%><li><span style=\"background-color:<%=datasets[i].strokeColor%>\"></span><%if(datasets[i].label){%><%=datasets[i].label%><%}%></li><%}%></ul>"
+		legendTemplate : "<ul class=\"<%=name.toLowerCase()%>-legend\"><% for (var i=0; i<datasets.length; i++){%><li><span style=\"background-color:<%=datasets[i].strokeColor%>\"></span><%if(datasets[i].label){%><%=datasets[i].label%><%}%></li><%}%></ul>",
+
+		//Boolean - Whether any of the datasets has images at points
+		hasImages : true
 	};
 
 
@@ -59,6 +62,9 @@
 				display: this.options.pointDot,
 				hitDetectionRadius : this.options.pointHitDetectionRadius,
 				ctx : this.chart.ctx,
+				image : this.options.hasImages,
+				imageWidth : this.options.hasImages,
+				imageHeight : this.options.hasImages,
 				inRange : function(mouseX){
 					return (Math.pow(mouseX-this.x, 2) < Math.pow(this.radius + this.hitDetectionRadius,2));
 				}
@@ -91,6 +97,7 @@
 					pointColor : dataset.pointColor,
 					pointStrokeColor : dataset.pointStrokeColor,
 					lineDash: dataset.lineDash || false,
+					image: dataset.image || false,
 					points : []
 				};
 
@@ -99,26 +106,68 @@
 
 				helpers.each(dataset.data,function(dataPoint,index){
 					//Add a new point for each piece of data, passing any required data to draw.
-					datasetObject.points.push(new this.PointClass({
-						value : dataPoint,
-						label : data.labels[index],
-						datasetLabel: dataset.label,
-						strokeColor : dataset.pointStrokeColor,
-						fillColor : dataset.pointColor,
-						highlightFill : dataset.pointHighlightFill || dataset.pointColor,
-						highlightStroke : dataset.pointHighlightStroke || dataset.pointStrokeColor
-					}));
+					if (this.options.hasImages && dataset.image && Object.prototype.toString.call(dataPoint) === '[object Array]') {
+						var arrayToPush = [];
+						helpers.each(dataPoint, function(dataSubPoint, subIndex) {
+							arrayToPush.push(new this.PointClass({
+								value : dataSubPoint.value,
+								image : dataSubPoint.pointImage,
+								imageWidth : dataSubPoint.width,
+								imageHeight : dataSubPoint.height,
+								label : data.labels[index],
+								datasetLabel: dataset.label,
+								strokeColor : dataset.pointStrokeColor,
+								fillColor : dataset.pointColor,
+								highlightFill : dataset.pointHighlightFill || dataset.pointColor,
+								highlightStroke : dataset.pointHighlightStroke || dataset.pointStrokeColor
+							}));
+						}, this);
+						if (arrayToPush.length === 0) {
+							arrayToPush = new this.PointClass({
+								value : undefined,
+								label : data.labels[index],
+								datasetLabel: dataset.label,
+								strokeColor : dataset.pointStrokeColor,
+								fillColor : dataset.pointColor,
+								highlightFill : dataset.pointHighlightFill || dataset.pointColor,
+								highlightStroke : dataset.pointHighlightStroke || dataset.pointStrokeColor
+							});
+						}
+						datasetObject.points.push(arrayToPush);
+					}
+					else {
+						datasetObject.points.push(new this.PointClass({
+							value : dataPoint,
+							label : data.labels[index],
+							datasetLabel: dataset.label,
+							strokeColor : dataset.pointStrokeColor,
+							fillColor : dataset.pointColor,
+							highlightFill : dataset.pointHighlightFill || dataset.pointColor,
+							highlightStroke : dataset.pointHighlightStroke || dataset.pointStrokeColor
+						}));
+					}
 				},this);
 
 				this.buildScale(data.labels);
 
 
 				this.eachPoints(function(point, index){
-					helpers.extend(point, {
-						x: this.scale.calculateX(index),
-						y: this.scale.endPoint
-					});
-					point.save();
+					if (Object.prototype.toString.call(point) === '[object Array]') {
+						helpers.each(point, function(dataPoint, arrayIndex) {
+							helpers.extend(dataPoint, {
+								x: this.scale.calculateX(index),
+								y: this.scale.endPoint
+							});
+							dataPoint.save();
+						}, this);
+					}
+					else {
+						helpers.extend(point, {
+							x: this.scale.calculateX(index),
+							y: this.scale.endPoint
+						});
+						point.save();
+					}
 				}, this);
 
 			},this);
@@ -252,13 +301,16 @@
 
 			// Some helper methods for getting the next/prev points
 			var hasValue = function(item){
-				return item.value !== null;
+				return item.value !== null && item.value !== undefined;
 			},
 			nextPoint = function(point, collection, index){
 				return helpers.findNextWhere(collection, hasValue, index) || point;
 			},
 			previousPoint = function(point, collection, index){
 				return helpers.findPreviousWhere(collection, hasValue, index) || point;
+			},
+			isArray = function(item){
+				return Object.prototype.toString.call(item) === '[object Array]';
 			};
 
 			this.scale.draw(easingDecimal);
@@ -266,18 +318,38 @@
 
 			helpers.each(this.datasets,function(dataset){
 				var pointsWithValues = helpers.where(dataset.points, hasValue);
+				var pointsWithArrays;
+				if (dataset.image) {
+					pointsWithArrays = helpers.where(dataset.points, isArray);
+				}
 
 				//Transition each point first so that the line and point drawing isn't out of sync
 				//We can use this extra loop to calculate the control points of this dataset also in this loop
 
-				helpers.each(dataset.points, function(point, index){
-					if (point.hasValue()){
-						point.transition({
-							y : this.scale.calculateY(point.value),
-							x : this.scale.calculateX(index)
-						}, easingDecimal);
-					}
-				},this);
+				if (dataset.image) {
+					helpers.each(dataset.points, function(array, arrayIndex){
+						if (Object.prototype.toString.call(array) === '[object Array]') {
+							helpers.each(array, function(point, pointIndex){
+								if (point.hasValue()){
+									point.transition({
+										y : this.scale.calculateY(point.value),
+										x : this.scale.calculateX(arrayIndex)
+									}, easingDecimal);
+								}
+							},this);
+						}
+					},this);
+				}
+				else {
+					helpers.each(dataset.points, function(point, index){
+						if (point.hasValue()){
+							point.transition({
+								y : this.scale.calculateY(point.value),
+								x : this.scale.calculateX(index)
+							}, easingDecimal);
+						}
+					},this);
+				}
 
 
 				// Control points need to be calculated in a seperate loop, because we need to know the current x/y of the point
@@ -321,7 +393,7 @@
 					ctx.setLineDash([5,3]);
 				}
 				else {
-					ctx.setLineDash([1, 0])
+					ctx.setLineDash([1, 0]);
 				}
 
 				ctx.beginPath();
@@ -366,9 +438,16 @@
 				helpers.each(pointsWithValues,function(point){
 					point.draw();
 				});
+				if (dataset.image) {
+					helpers.each(pointsWithArrays,function(array){
+						if (Object.prototype.toString.call(array) === '[object Array]') {
+							helpers.each(array,function(point){
+								ctx.drawImage(point.image, point.x - point.imageWidth / 2, point.y - point.imageHeight / 2, point.imageWidth, point.imageHeight);
+							});
+						}
+					});
+				}
 			},this);
 		}
 	});
-
-
 }).call(this);
