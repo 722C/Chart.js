@@ -1,7 +1,7 @@
 /*!
  * Chart.js
  * http://chartjs.org/
- * Version: 1.0.1-beta.4
+ * Version: 1.0.1-beta.5a
  *
  * Copyright 2014 Nick Downie
  * Released under the MIT license
@@ -759,6 +759,8 @@
 				ctx.canvas.height = height * window.devicePixelRatio;
 				ctx.canvas.width = width * window.devicePixelRatio;
 				ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+				ctx.canvas.style.width = width / window.devicePixelRatio + "px";
+				ctx.canvas.style.height = height / window.devicePixelRatio + "px";
 			}
 		},
 		//-- Canvas methods
