@@ -759,6 +759,8 @@
 				ctx.canvas.height = height * window.devicePixelRatio;
 				ctx.canvas.width = width * window.devicePixelRatio;
 				ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+				ctx.canvas.style.width = width / window.devicePixelRatio + "px";
+				ctx.canvas.style.height = height / window.devicePixelRatio + "px";
 			}
 		},
 		//-- Canvas methods
